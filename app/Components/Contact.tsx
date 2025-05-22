@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Button from "./Button";
 import SocialIcon from "./SocialIcon";
 
@@ -10,6 +10,27 @@ export default function Contact() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  // ✅ Autofill from localStorage when component mounts
+  useEffect(() => {
+    const savedName = localStorage.getItem("contact_name");
+    const savedEmail = localStorage.getItem("contact_email");
+    const savedMessage = localStorage.getItem("contact_message");
+
+    if (nameRef.current) nameRef.current.value = savedName || "";
+    if (emailRef.current) emailRef.current.value = savedEmail || "";
+    if (messageRef.current) messageRef.current.value = savedMessage || "";
+  }, []);
+
+  // ✅ Save to localStorage as user types
+  const handleChange = () => {
+    if (nameRef.current)
+      localStorage.setItem("contact_name", nameRef.current.value);
+    if (emailRef.current)
+      localStorage.setItem("contact_email", emailRef.current.value);
+    if (messageRef.current)
+      localStorage.setItem("contact_message", messageRef.current.value);
+  };
 
   const handleKeyDown = (
     e: React.KeyboardEvent,
@@ -25,7 +46,7 @@ export default function Contact() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const name = nameRef.current?.value.trim();
     const email = emailRef.current?.value.trim();
     const message = messageRef.current?.value.trim();
@@ -36,7 +57,6 @@ export default function Contact() {
       return;
     }
   
-    // ✅ Email format validation
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(email)) {
       setError("Please enter a valid email address.");
@@ -44,20 +64,42 @@ export default function Contact() {
       return;
     }
   
-    // ✅ Clear error and set success
     setError("");
-    setSuccess(true);
   
-    // ✅ Scroll to top of the page smoothly
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const response = await fetch("https://formspree.io/f/xldbknrw", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          message,
+        }),
+      });
   
-    // ✅ Optional: reset form fields
-    if (nameRef.current) nameRef.current.value = "";
-    if (emailRef.current) emailRef.current.value = "";
-    if (messageRef.current) messageRef.current.value = "";
+      if (response.ok) {
+        setSuccess(true);
+        // Clear inputs and localStorage on success
+        if (nameRef.current) nameRef.current.value = "";
+        if (emailRef.current) emailRef.current.value = "";
+        if (messageRef.current) messageRef.current.value = "";
+        localStorage.removeItem("contact_name");
+        localStorage.removeItem("contact_email");
+        localStorage.removeItem("contact_message");
+      } else {
+        const data = await response.json();
+        setError(data.error || "Something went wrong. Please try again.");
+        setSuccess(false);
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+      setSuccess(false);
+    }
   };
   
-
   return (
     <section
       id="contact"
@@ -86,35 +128,36 @@ export default function Contact() {
             handleSubmit();
           }}
         >
-          {/* Left - Input Fields */}
           <div className="flex-1 flex flex-col gap-4 text-black">
             <input
               type="text"
               placeholder="Your Name"
               ref={nameRef}
               onKeyDown={(e) => handleKeyDown(e, emailRef)}
+              onChange={handleChange} // ✅ Added
               className="rounded-lg border border-gray-400 px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
             />
             <input
-  type="email"
-  placeholder="Your Email"
-  ref={emailRef}
-  onKeyDown={(e) => {
-    if (e.key === " ") e.preventDefault(); // prevent space
-    handleKeyDown(e, messageRef);
-  }}
-  className="rounded-lg border border-gray-400 px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-/>
+              type="email"
+              placeholder="Your Email"
+              ref={emailRef}
+              onKeyDown={(e) => {
+                if (e.key === " ") e.preventDefault();
+                handleKeyDown(e, messageRef);
+              }}
+              onChange={handleChange} // ✅ Added
+              className="rounded-lg border border-gray-400 px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
             <textarea
               rows={5}
               placeholder="Your Message"
               ref={messageRef}
               onKeyDown={(e) => handleKeyDown(e)}
+              onChange={handleChange} // ✅ Added
               className="rounded-lg border border-gray-400 px-4 py-3 text-sm shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
             />
           </div>
 
-          {/* Right - Button */}
           <div className="flex flex-col items-center justify-between gap-6 md:w-1/3">
             <Button
               value="Send Message"
@@ -123,16 +166,9 @@ export default function Contact() {
           </div>
         </form>
 
-        {/* Social Icons */}
         <div className="flex gap-6 text-gray-700 text-2xl justify-center">
-          <SocialIcon
-            icon="github"
-            url="https://github.com/Shailavi04"
-          />
-          <SocialIcon
-            icon="linkedin"
-            url="https://www.linkedin.com/in/shailavi-srivastava-05a807243?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app"
-          />
+          <SocialIcon icon="github" url="https://github.com/Shailavi04" />
+          <SocialIcon icon="linkedin" url="https://www.linkedin.com/in/shailavi-srivastava-05a807243" />
           <SocialIcon icon="x" url="https://x.com/Sri04Shailavi" />
         </div>
       </div>
